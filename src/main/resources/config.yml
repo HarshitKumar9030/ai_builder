@@ -1,0 +1,65 @@
+# AI Structure Builder Configuration
+
+# Google Gemini API Configuration
+gemini:
+  # Your Google Gemini API Key (get from https://makersuite.google.com/app/apikey)
+  api-key: "YOUR_GEMINI_API_KEY_HERE"
+  # Gemini model to use (gemini-2.0-flash-exp is recommended)
+  model: "gemini-2.0-flash-exp"  # Maximum tokens for AI response (reduced to prevent truncation)
+  max-tokens: 2000
+  # Temperature for AI creativity (0.0 = deterministic, 1.0 = very creative)
+  temperature: 0.7
+  # Timeout settings (in seconds)
+  timeout:
+    connect: 30
+    read: 60
+    write: 30
+  # Retry settings
+  retry:
+    max-attempts: 3
+    delay-seconds: 2
+
+# Building Configuration
+building:
+  # Maximum size for AI-generated structures (safety limit)
+  max-structure-size: 100
+  # Default materials for structures
+  default-materials:
+    - "STONE"
+    - "COBBLESTONE"
+    - "STONE_BRICKS"
+    - "OAK_PLANKS"
+    - "GLASS"
+  # Whether to require confirmation before building large structures
+  require-confirmation: true
+  # Minimum size to require confirmation
+  confirmation-threshold: 50
+
+# Performance Settings
+performance:
+  # Maximum blocks to place per tick (higher = faster but more lag)
+  blocks-per-tick: 10
+  # Delay between building operations (in ticks)
+  build-delay: 2
+  # Enable async building for better performance
+  async-building: true
+
+# Logging
+logging:
+  # Log AI requests and responses
+  log-ai-requests: false
+  # Log building operations
+  log-building: true
+  # Debug mode
+  debug: false
+
+# Messages
+messages:
+  prefix: "&8[&6AI Builder&8] &r"
+  no-permission: "&cYou don't have permission to use this command!"
+  invalid-usage: "&cInvalid usage! Use: %usage%"
+  building-started: "&aStarting to build: %description%"
+  building-completed: "&aBuilding completed!"
+  building-failed: "&cBuilding failed: %error%"
+  config-updated: "&aConfiguration updated!"
+  api-key-not-set: "&cPlease set your Gemini API key using /aiconfig set gemini.api-key <key>"

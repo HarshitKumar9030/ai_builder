@@ -1,0 +1,58 @@
+name: AIStructureBuilder
+version: 1.0.0
+description: A Minecraft Spigot plugin that builds structures using Google Gemini AI
+author: YourName
+main: com.aibuilder.AIStructureBuilder
+api-version: 1.20
+depend: []
+softdepend: []
+
+commands:
+  aibuild:
+    description: Build a structure using AI
+    usage: /aibuild <description>
+    permission: aibuilder.build
+    permission-message: You don't have permission to use AI building!
+  aiconfig:
+    description: Configure AI Builder settings
+    usage: /aiconfig <set|get> <key> [value]
+    permission: aibuilder.admin
+    permission-message: You don't have permission to configure AI Builder!
+  aihelp:
+    description: Show AI Builder help
+    usage: /aihelp
+    permission: aibuilder.help
+  aistatus:
+    description: Show plugin status and configuration
+    usage: /aistatus
+    permission: aibuilder.help
+  aiprogress:
+    description: Check your current build progress
+    usage: /aiprogress
+    permission: aibuilder.build
+  aicancel:
+    description: Cancel your current build
+    usage: /aicancel
+    permission: aibuilder.build
+  aipreview:
+    description: Preview a structure before building
+    usage: /aipreview <description>
+    permission: aibuilder.build
+
+permissions:
+  aibuilder.*:
+    description: All AI Builder permissions
+    children:
+      aibuilder.build: true
+      aibuilder.admin: true
+      aibuilder.help: true
+    default: op
+  aibuilder.build:
+    description: Permission to build structures with AI
+    default: op
+  aibuilder.admin:
+    description: Permission to configure AI Builder
+    default: op
+  aibuilder.help:
+    description: Permission to view help
+    default: op

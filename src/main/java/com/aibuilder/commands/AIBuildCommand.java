@@ -1,0 +1,98 @@
+package com.aibuilder.commands;
+
+import com.aibuilder.AIStructureBuilder;
+import com.aibuilder.model.StructureData;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Handles /aibuild command
+ */
+public class AIBuildCommand implements CommandExecutor {
+    
+    private final AIStructureBuilder plugin;
+
+    public AIBuildCommand(AIStructureBuilder plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // Check if sender is a player
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("This command can only be used by players!");
+            return true;
+        }
+
+        Player player = (Player) sender;
+
+        // Check permission
+        if (!player.hasPermission("aibuilder.build")) {
+            player.sendMessage(plugin.getMessage("no-permission"));
+            return true;
+        }
+
+        // Check if AI is configured
+        if (!plugin.getAiManager().isConfigured()) {
+            player.sendMessage(plugin.getMessage("api-key-not-set"));
+            return true;
+        }
+
+        // Check arguments
+        if (args.length == 0) {
+            player.sendMessage(plugin.getMessage("invalid-usage", "/aibuild <description>"));
+            return true;
+        }
+
+        // Join arguments to form description
+        String description = String.join(" ", args);
+
+        // Check for active build
+        if (plugin.getBuildManager().hasActiveBuild(player.getUniqueId())) {
+            player.sendMessage("§cYou already have an active build! Please wait for it to complete.");
+            return true;
+        }
+
+        // Start building process
+        player.sendMessage("§eGenerating structure with AI... Please wait.");
+        
+        int maxSize = plugin.getConfigManager().getMaxStructureSize();
+        
+        CompletableFuture<StructureData> future = plugin.getAiManager().generateStructureWithProgress(description, maxSize,
+            progress -> player.sendMessage("§7[AI] " + progress));
+        
+        future.thenAccept(structureData -> {
+            // Check if player is still online
+            if (!player.isOnline()) {
+                return;
+            }
+            
+            // Check if confirmation is required
+            int estimatedSize = plugin.getBuildManager().getEstimatedSize(structureData);
+            if (plugin.getConfigManager().requireConfirmation() && 
+                estimatedSize > plugin.getConfigManager().getConfirmationThreshold()) {
+                
+                player.sendMessage("§eStructure '" + structureData.getName() + "' will use " + estimatedSize + " blocks.");
+                player.sendMessage("§eType '/aibuild confirm' to proceed or '/aibuild cancel' to cancel.");
+                
+                // Store structure data for confirmation (you'd need to implement this storage)
+                // For now, we'll proceed directly
+            }
+              // Start building with progress updates
+            plugin.getBuildManager().buildStructureWithProgress(player, structureData,
+                buildProgress -> player.sendMessage("§7[Build] " + buildProgress));
+            
+        }).exceptionally(throwable -> {
+            if (player.isOnline()) {
+                player.sendMessage(plugin.getMessage("building-failed", throwable.getMessage()));
+            }
+            return null;
+        });
+
+        return true;
+    }
+}
