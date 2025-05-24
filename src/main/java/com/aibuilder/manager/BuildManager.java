@@ -240,10 +240,10 @@ public class BuildManager {
         int blockCount = structureData.getBlocks().size();
         
         plugin.getLogger().info("Validating structure: " + blockCount + " blocks, maxSize: " + maxSize);
-        
-        // Check total block count
-        if (blockCount > maxSize * maxSize * maxSize) {
-            plugin.getLogger().warning("Structure validation failed: too many blocks (" + blockCount + " > " + (maxSize * maxSize * maxSize) + ")");
+          // Check total block count - use a reasonable limit instead of overflow-prone calculation
+        int maxTotalBlocks = Math.min(50000, maxSize); // Cap at 50k blocks or maxSize, whichever is smaller
+        if (blockCount > maxTotalBlocks) {
+            plugin.getLogger().warning("Structure validation failed: too many blocks (" + blockCount + " > " + maxTotalBlocks + ")");
             return false;
         }
           // Check individual coordinates
