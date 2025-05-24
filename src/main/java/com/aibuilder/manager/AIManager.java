@@ -246,13 +246,20 @@ public class AIManager {
             sizeGuidance = "LARGE and DETAILED";
             dimensionGuidance = "Maximum size: 20x20x20 blocks";
         }
-        
-        return String.format(
+          return String.format(
             "You are a Minecraft master architect. Create a %s, DETAILED structure for: \"%s\"\n\n" +
             "REQUIREMENTS:\n" +
             "- Target %d blocks total (aim for substantial structures with good detail)\n" +
             "- %s\n" +
-            "- Use diverse materials: STONE, STONE_BRICKS, COBBLESTONE, OAK_PLANKS, SPRUCE_PLANKS, BIRCH_PLANKS, GLASS, GLASS_PANE, DIRT, GRASS_BLOCK, QUARTZ_BLOCK, BRICK, SANDSTONE, OAK_LOG, SPRUCE_LOG, OAK_STAIRS, STONE_STAIRS, STONE_SLAB, OAK_SLAB\n" +
+            "- Use diverse materials: STONE, STONE_BRICKS, MOSSY_STONE_BRICKS, CRACKED_STONE_BRICKS, COBBLESTONE, SMOOTH_STONE, GRANITE, POLISHED_GRANITE, DIORITE, POLISHED_DIORITE, ANDESITE, POLISHED_ANDESITE, " +
+            "OAK_PLANKS, SPRUCE_PLANKS, BIRCH_PLANKS, JUNGLE_PLANKS, ACACIA_PLANKS, DARK_OAK_PLANKS, OAK_LOG, SPRUCE_LOG, BIRCH_LOG, JUNGLE_LOG, ACACIA_LOG, DARK_OAK_LOG, " +
+            "GLASS, WHITE_STAINED_GLASS, LIGHT_BLUE_STAINED_GLASS, YELLOW_STAINED_GLASS, GLASS_PANE, WHITE_STAINED_GLASS_PANE, " +
+            "BRICKS, SANDSTONE, RED_SANDSTONE, QUARTZ_BLOCK, SMOOTH_QUARTZ, PRISMARINE, PRISMARINE_BRICKS, BLACKSTONE, POLISHED_BLACKSTONE, NETHER_BRICKS, END_STONE_BRICKS, " +
+            "WHITE_TERRACOTTA, ORANGE_TERRACOTTA, LIGHT_BLUE_TERRACOTTA, WHITE_CONCRETE, GRAY_CONCRETE, LIGHT_GRAY_CONCRETE, WHITE_WOOL, LIGHT_GRAY_WOOL, " +
+            "OAK_STAIRS, SPRUCE_STAIRS, STONE_STAIRS, STONE_BRICK_STAIRS, GRANITE_STAIRS, BRICK_STAIRS, SANDSTONE_STAIRS, QUARTZ_STAIRS, " +
+            "OAK_SLAB, SPRUCE_SLAB, STONE_SLAB, STONE_BRICK_SLAB, SMOOTH_STONE_SLAB, GRANITE_SLAB, BRICK_SLAB, SANDSTONE_SLAB, QUARTZ_SLAB, " +
+            "OAK_FENCE, SPRUCE_FENCE, IRON_BARS, CHAIN, LANTERN, TORCH, OAK_DOOR, IRON_DOOR, OAK_TRAPDOOR, LADDER, " +
+            "DIRT, GRASS_BLOCK, SAND, GRAVEL, WATER, SNOW_BLOCK, BOOKSHELF, CHEST, CRAFTING_TABLE, FURNACE, FLOWER_POT, AIR\n" +
             "- Create realistic, detailed architecture with proper foundations, walls, roofs, and interior features\n" +
             "- Add architectural details like windows, doors, stairs, decorative elements\n" +
             "- Coordinates start at (0,0,0)\n" +
@@ -262,8 +269,7 @@ public class AIManager {
             "- For castles: Include towers, walls, battlements, courtyard\n" +
             "- For modern buildings: Include glass facades, geometric designs\n" +
             "- For bridges: Include support pillars, railings, decorative arches\n" +
-            "- Always include proper foundations and structural support\n\n" +
-            "RESPOND WITH VALID JSON ONLY (no markdown, no explanations):\n" +
+            "- Always include proper foundations and structural support\n\n" +            "RESPOND WITH VALID JSON ONLY (no markdown, no explanations, no comments):\n" +
             "{\n" +
             "  \"name\": \"Structure Name\",\n" +
             "  \"description\": \"Detailed description\",\n" +
@@ -282,10 +288,12 @@ public class AIManager {
             "    }\n" +
             "  ]\n" +
             "}\n\n" +
-            "IMPORTANT:\n" +
+            "CRITICAL REQUIREMENTS:\n" +
+            "- Return ONLY valid JSON - NO comments (//) anywhere\n" +
+            "- NO markdown formatting (```json)\n" +
+            "- NO explanations or text outside JSON\n" +
+            "- Keep response under 4000 characters total\n" +
             "- Generate substantial structures with %d+ blocks for impressive builds\n" +
-            "- Only respond with valid JSON\n" +
-            "- Do not use markdown formatting\n" +
             "- Use realistic proportions and architectural principles\n" +
             "- Include detailed features and decorative elements\n" +
             "- Make it architecturally sound and visually impressive",

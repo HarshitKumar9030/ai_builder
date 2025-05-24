@@ -5,6 +5,7 @@ import com.aibuilder.model.StructureData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 
@@ -17,10 +18,17 @@ import java.util.regex.Pattern;
  * Enhanced AI response processor with robust JSON handling and fallback strategies
  */
 @RequiredArgsConstructor
-public class EnhancedResponseProcessor {
-      private final AIStructureBuilder plugin;
+public class EnhancedResponseProcessor {    private final AIStructureBuilder plugin;
     private final Gson gson = new Gson();
-    private final JsonFactory jsonFactory = new JsonFactory();    /**
+    private final JsonFactory jsonFactory;
+    
+    public EnhancedResponseProcessor(AIStructureBuilder plugin) {
+        this.plugin = plugin;
+        this.jsonFactory = new JsonFactory();
+        // Enable comments in JSON parsing
+        this.jsonFactory.enable(JsonParser.Feature.ALLOW_COMMENTS);
+        this.jsonFactory.enable(JsonParser.Feature.ALLOW_YAML_COMMENTS);
+    }/**
      * Process AI response with multiple parsing strategies
      */
     public StructureData processResponse(String response, String originalPrompt) {
@@ -270,9 +278,7 @@ public class EnhancedResponseProcessor {
         } else {
             return generateGenericFallback();
         }
-    }
-
-    /**
+    }    /**
      * Clean response from markdown and other formatting
      */
     private String cleanResponse(String response) {
@@ -283,6 +289,25 @@ public class EnhancedResponseProcessor {
         // Remove markdown code blocks
         cleaned = cleaned.replaceAll("```json\\s*", "");
         cleaned = cleaned.replaceAll("```\\s*$", "");
+        
+        // Remove comments (// style comments) - line by line to preserve structure
+        String[] lines = cleaned.split("\n");
+        StringBuilder result = new StringBuilder();
+        
+        for (String line : lines) {
+            // Find // comments but not inside strings
+            int commentStart = findCommentStart(line);
+            if (commentStart >= 0) {
+                line = line.substring(0, commentStart).trim();
+            }
+            
+            // Only add non-empty lines
+            if (!line.trim().isEmpty()) {
+                result.append(line).append("\n");
+            }
+        }
+        
+        cleaned = result.toString();
         
         // Remove any text before the first {
         int firstBrace = cleaned.indexOf('{');
@@ -297,6 +322,40 @@ public class EnhancedResponseProcessor {
         }
         
         return cleaned;
+    }
+    
+    /**
+     * Find the start of a comment, being careful not to find // inside strings
+     */
+    private int findCommentStart(String line) {
+        boolean inString = false;
+        boolean escapeNext = false;
+        
+        for (int i = 0; i < line.length() - 1; i++) {
+            char c = line.charAt(i);
+            char next = line.charAt(i + 1);
+            
+            if (escapeNext) {
+                escapeNext = false;
+                continue;
+            }
+            
+            if (c == '\\') {
+                escapeNext = true;
+                continue;
+            }
+            
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString && c == '/' && next == '/') {
+                return i;
+            }
+        }
+        
+        return -1;
     }
 
     /**

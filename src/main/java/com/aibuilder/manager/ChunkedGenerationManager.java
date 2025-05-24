@@ -135,22 +135,19 @@ public class ChunkedGenerationManager {
             }
         });
     }
-    
-    /**
+      /**
      * Generate overall structure plan
      */
     private String generateOverallPlan(String description, int chunksPerSide, Consumer<String> progressCallback) throws IOException {
         progressCallback.accept("Creating overall structure plan...");
         
-        String planPrompt = "Create a detailed plan for a large Minecraft structure: " + description + "\n\n" +
-                "The structure will be built in a " + chunksPerSide + "x" + chunksPerSide + " grid of chunks.\n" +
-                "For each chunk position (0,0) to (" + (chunksPerSide-1) + "," + (chunksPerSide-1) + "), describe:\n" +
-                "1. What should be built in that chunk\n" +
-                "2. How it connects to neighboring chunks\n" +
-                "3. The main purpose/theme of that section\n\n" +
-                "Make this a cohesive, detailed " + description + " that uses the full area effectively.\n" +
-                "Focus on creating variety and interesting architectural features.\n\n" +
-                "Format as a grid layout plan.";
+        String planPrompt = "Create a brief plan for a Minecraft structure: " + description + "\n\n" +
+                "Structure will be " + chunksPerSide + "x" + chunksPerSide + " chunks.\n" +
+                "For each chunk position (0,0) to (" + (chunksPerSide-1) + "," + (chunksPerSide-1) + "), describe in 1-2 words:\n" +
+                "What should be built in that chunk.\n\n" +
+                "Keep it simple and under 500 characters total.\n" +
+                "NO comments, NO extra text, just the plan.\n\n" +
+                "Example: entrance, walls, courtyard, tower, etc.";
         
         return callGeminiAPI(planPrompt);
     }
@@ -212,21 +209,21 @@ public class ChunkedGenerationManager {
         String response = callGeminiAPI(chunkPrompt);
         return responseProcessor.processResponse(response, chunk.getDescription());
     }
-    
-    /**
+      /**
      * Create prompt for individual chunk
      */
     private String createChunkPrompt(ChunkInfo chunk, int chunkSize) {
         return "Generate a Minecraft structure chunk for: " + chunk.getDescription() + "\n\n" +
-                "CONSTRAINTS:\n" +
+                "CRITICAL REQUIREMENTS:\n" +
                 "- Chunk size: " + chunkSize + "x" + chunkSize + "x" + chunkSize + " blocks\n" +
                 "- Coordinates: X[0-" + (chunkSize-1) + "], Y[0-" + (chunkSize-1) + "], Z[0-" + (chunkSize-1) + "]\n" +
                 "- This is chunk (" + chunk.getChunkX() + "," + chunk.getChunkZ() + ") in a larger structure\n" +
-                "- Make this chunk detailed and interesting\n" +
-                "- Use a variety of materials and heights\n" +
-                "- Consider connections to adjacent chunks\n\n" +
+                "- Return ONLY valid JSON - NO comments, NO explanations, NO markdown\n" +
+                "- Do NOT use // comments or any other text outside JSON\n" +
+                "- Keep response under 3000 characters\n" +
+                "- Maximum " + (chunkSize * chunkSize * chunkSize / 4) + " blocks\n\n" +
                 "CONTEXT:\n" + chunk.getContext() + "\n\n" +
-                "Generate JSON with this exact structure:\n" +
+                "Return this exact JSON format:\n" +
                 "{\n" +
                 "  \"name\": \"structure name\",\n" +
                 "  \"description\": \"description\",\n" +
@@ -234,11 +231,67 @@ public class ChunkedGenerationManager {
                 "  \"blocks\": [\n" +
                 "    {\"x\": 0, \"y\": 0, \"z\": 0, \"material\": \"STONE\", \"data\": \"\"}\n" +
                 "  ]\n" +
-                "}\n\n" +
-                "Use these materials: STONE, COBBLESTONE, STONE_BRICKS, OAK_PLANKS, OAK_LOG, GLASS, " +
-                "IRON_BARS, OAK_STAIRS, STONE_BRICK_STAIRS, OAK_SLAB, STONE_BRICK_SLAB, " +
-                "COBBLESTONE_STAIRS, MOSSY_STONE_BRICKS, CRACKED_STONE_BRICKS, " +
-                "DARK_OAK_PLANKS, SPRUCE_PLANKS, BIRCH_PLANKS, AIR";
+                "}\n\n" +                "Use these materials: STONE, COBBLESTONE, STONE_BRICKS, MOSSY_STONE_BRICKS, CRACKED_STONE_BRICKS, " +
+                "CHISELED_STONE_BRICKS, SMOOTH_STONE, GRANITE, POLISHED_GRANITE, DIORITE, POLISHED_DIORITE, " +
+                "ANDESITE, POLISHED_ANDESITE, DEEPSLATE, COBBLED_DEEPSLATE, POLISHED_DEEPSLATE, " +
+                "OAK_PLANKS, SPRUCE_PLANKS, BIRCH_PLANKS, JUNGLE_PLANKS, ACACIA_PLANKS, DARK_OAK_PLANKS, " +
+                "MANGROVE_PLANKS, CHERRY_PLANKS, BAMBOO_PLANKS, CRIMSON_PLANKS, WARPED_PLANKS, " +
+                "OAK_LOG, SPRUCE_LOG, BIRCH_LOG, JUNGLE_LOG, ACACIA_LOG, DARK_OAK_LOG, MANGROVE_LOG, " +
+                "CHERRY_LOG, BAMBOO_BLOCK, CRIMSON_STEM, WARPED_STEM, STRIPPED_OAK_LOG, STRIPPED_SPRUCE_LOG, " +
+                "GLASS, WHITE_STAINED_GLASS, ORANGE_STAINED_GLASS, MAGENTA_STAINED_GLASS, LIGHT_BLUE_STAINED_GLASS, " +
+                "YELLOW_STAINED_GLASS, LIME_STAINED_GLASS, PINK_STAINED_GLASS, GRAY_STAINED_GLASS, " +
+                "LIGHT_GRAY_STAINED_GLASS, CYAN_STAINED_GLASS, PURPLE_STAINED_GLASS, BLUE_STAINED_GLASS, " +
+                "BROWN_STAINED_GLASS, GREEN_STAINED_GLASS, RED_STAINED_GLASS, BLACK_STAINED_GLASS, " +
+                "GLASS_PANE, WHITE_STAINED_GLASS_PANE, IRON_BARS, " +
+                "BRICKS, MUD_BRICKS, PACKED_MUD, SANDSTONE, RED_SANDSTONE, SMOOTH_SANDSTONE, " +
+                "CUT_SANDSTONE, CHISELED_SANDSTONE, QUARTZ_BLOCK, SMOOTH_QUARTZ, QUARTZ_PILLAR, " +
+                "CHISELED_QUARTZ_BLOCK, PRISMARINE, PRISMARINE_BRICKS, DARK_PRISMARINE, " +
+                "BLACKSTONE, POLISHED_BLACKSTONE, POLISHED_BLACKSTONE_BRICKS, CRACKED_POLISHED_BLACKSTONE_BRICKS, " +
+                "NETHER_BRICKS, RED_NETHER_BRICKS, CHISELED_NETHER_BRICKS, CRACKED_NETHER_BRICKS, " +
+                "END_STONE, END_STONE_BRICKS, PURPUR_BLOCK, PURPUR_PILLAR, " +
+                "TERRACOTTA, WHITE_TERRACOTTA, ORANGE_TERRACOTTA, MAGENTA_TERRACOTTA, LIGHT_BLUE_TERRACOTTA, " +
+                "YELLOW_TERRACOTTA, LIME_TERRACOTTA, PINK_TERRACOTTA, GRAY_TERRACOTTA, LIGHT_GRAY_TERRACOTTA, " +
+                "CYAN_TERRACOTTA, PURPLE_TERRACOTTA, BLUE_TERRACOTTA, BROWN_TERRACOTTA, GREEN_TERRACOTTA, " +
+                "RED_TERRACOTTA, BLACK_TERRACOTTA, GLAZED_TERRACOTTA, " +
+                "WHITE_CONCRETE, ORANGE_CONCRETE, MAGENTA_CONCRETE, LIGHT_BLUE_CONCRETE, YELLOW_CONCRETE, " +
+                "LIME_CONCRETE, PINK_CONCRETE, GRAY_CONCRETE, LIGHT_GRAY_CONCRETE, CYAN_CONCRETE, " +
+                "PURPLE_CONCRETE, BLUE_CONCRETE, BROWN_CONCRETE, GREEN_CONCRETE, RED_CONCRETE, BLACK_CONCRETE, " +
+                "WHITE_WOOL, ORANGE_WOOL, MAGENTA_WOOL, LIGHT_BLUE_WOOL, YELLOW_WOOL, LIME_WOOL, " +
+                "PINK_WOOL, GRAY_WOOL, LIGHT_GRAY_WOOL, CYAN_WOOL, PURPLE_WOOL, BLUE_WOOL, " +
+                "BROWN_WOOL, GREEN_WOOL, RED_WOOL, BLACK_WOOL, " +
+                "OAK_STAIRS, SPRUCE_STAIRS, BIRCH_STAIRS, JUNGLE_STAIRS, ACACIA_STAIRS, DARK_OAK_STAIRS, " +
+                "STONE_STAIRS, COBBLESTONE_STAIRS, STONE_BRICK_STAIRS, MOSSY_STONE_BRICK_STAIRS, " +
+                "GRANITE_STAIRS, POLISHED_GRANITE_STAIRS, DIORITE_STAIRS, POLISHED_DIORITE_STAIRS, " +
+                "ANDESITE_STAIRS, POLISHED_ANDESITE_STAIRS, BRICK_STAIRS, SANDSTONE_STAIRS, " +
+                "RED_SANDSTONE_STAIRS, PRISMARINE_STAIRS, PRISMARINE_BRICK_STAIRS, DARK_PRISMARINE_STAIRS, " +
+                "NETHER_BRICK_STAIRS, RED_NETHER_BRICK_STAIRS, BLACKSTONE_STAIRS, POLISHED_BLACKSTONE_STAIRS, " +
+                "POLISHED_BLACKSTONE_BRICK_STAIRS, QUARTZ_STAIRS, PURPUR_STAIRS, END_STONE_BRICK_STAIRS, " +
+                "OAK_SLAB, SPRUCE_SLAB, BIRCH_SLAB, JUNGLE_SLAB, ACACIA_SLAB, DARK_OAK_SLAB, " +
+                "STONE_SLAB, COBBLESTONE_SLAB, STONE_BRICK_SLAB, MOSSY_STONE_BRICK_SLAB, " +
+                "SMOOTH_STONE_SLAB, GRANITE_SLAB, POLISHED_GRANITE_SLAB, DIORITE_SLAB, POLISHED_DIORITE_SLAB, " +
+                "ANDESITE_SLAB, POLISHED_ANDESITE_SLAB, BRICK_SLAB, SANDSTONE_SLAB, CUT_SANDSTONE_SLAB, " +
+                "RED_SANDSTONE_SLAB, CUT_RED_SANDSTONE_SLAB, PRISMARINE_SLAB, PRISMARINE_BRICK_SLAB, " +
+                "DARK_PRISMARINE_SLAB, NETHER_BRICK_SLAB, RED_NETHER_BRICK_SLAB, BLACKSTONE_SLAB, " +
+                "POLISHED_BLACKSTONE_SLAB, POLISHED_BLACKSTONE_BRICK_SLAB, QUARTZ_SLAB, SMOOTH_QUARTZ_SLAB, " +
+                "PURPUR_SLAB, END_STONE_BRICK_SLAB, " +
+                "OAK_FENCE, SPRUCE_FENCE, BIRCH_FENCE, JUNGLE_FENCE, ACACIA_FENCE, DARK_OAK_FENCE, " +
+                "NETHER_BRICK_FENCE, IRON_BARS, CHAIN, " +
+                "LANTERN, SOUL_LANTERN, TORCH, SOUL_TORCH, REDSTONE_TORCH, " +
+                "OAK_DOOR, SPRUCE_DOOR, BIRCH_DOOR, JUNGLE_DOOR, ACACIA_DOOR, DARK_OAK_DOOR, IRON_DOOR, " +
+                "OAK_TRAPDOOR, SPRUCE_TRAPDOOR, BIRCH_TRAPDOOR, JUNGLE_TRAPDOOR, ACACIA_TRAPDOOR, DARK_OAK_TRAPDOOR, IRON_TRAPDOOR, " +
+                "LADDER, VINE, SCAFFOLDING, " +
+                "DIRT, GRASS_BLOCK, PODZOL, MYCELIUM, DIRT_PATH, FARMLAND, " +
+                "SAND, RED_SAND, GRAVEL, CLAY, " +
+                "WATER, LAVA, ICE, PACKED_ICE, BLUE_ICE, SNOW_BLOCK, SNOW, " +
+                "OBSIDIAN, CRYING_OBSIDIAN, RESPAWN_ANCHOR, " +
+                "BOOKSHELF, CHISELED_BOOKSHELF, LECTERN, " +
+                "CHEST, TRAPPED_CHEST, BARREL, SHULKER_BOX, " +
+                "CRAFTING_TABLE, FURNACE, BLAST_FURNACE, SMOKER, " +
+                "BELL, ANVIL, ENCHANTING_TABLE, BREWING_STAND, CAULDRON, " +
+                "FLOWER_POT, DECORATED_POT, " +
+                "COBWEB, MUSHROOM_STEM, BROWN_MUSHROOM_BLOCK, RED_MUSHROOM_BLOCK, " +
+                "SPONGE, WET_SPONGE, " +
+                "BEDROCK, BARRIER, STRUCTURE_VOID, AIR";
     }
     
     /**
