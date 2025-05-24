@@ -20,13 +20,16 @@ import java.util.regex.Pattern;
 public class EnhancedResponseProcessor {
       private final AIStructureBuilder plugin;
     private final Gson gson = new Gson();
-    private final JsonFactory jsonFactory = new JsonFactory();
-
-    /**
+    private final JsonFactory jsonFactory = new JsonFactory();    /**
      * Process AI response with multiple parsing strategies
      */
     public StructureData processResponse(String response, String originalPrompt) {
         plugin.getLogger().info("Processing AI response (" + response.length() + " characters)");
+        
+        // Check if response looks truncated
+        if (isTruncatedResponse(response)) {
+            plugin.getLogger().warning("Response appears to be truncated, will attempt repair");
+        }
         
         // Strategy 1: Direct JSON parsing
         try {
@@ -38,7 +41,7 @@ public class EnhancedResponseProcessor {
         } catch (Exception e) {
             plugin.getLogger().warning("Direct JSON parsing failed: " + e.getMessage());
         }
-        
+
         // Strategy 2: Extract JSON from markdown/text
         try {
             StructureData result = parseExtractedJson(response);
@@ -76,6 +79,24 @@ public class EnhancedResponseProcessor {
         plugin.getLogger().warning("All parsing strategies failed, generating fallback structure");
         return generateFallbackStructure(originalPrompt);
     }
+    
+    /**
+     * Check if the response appears to be truncated
+     */
+    private boolean isTruncatedResponse(String response) {
+        if (response == null || response.length() < 100) {
+            return true;
+        }
+        
+        String cleaned = cleanResponse(response);
+        
+        // Check for common signs of truncation
+        return cleaned.endsWith(",") || // Ends with comma
+               cleaned.matches(".*\"[^\"]*$") || // Ends with unterminated string
+               (cleaned.contains("blocks") && cleaned.contains("[") && !cleaned.contains("]")) || // Blocks array not closed
+               countChar(cleaned, '{') > countChar(cleaned, '}') || // Unmatched braces
+               countChar(cleaned, '[') > countChar(cleaned, ']'); // Unmatched brackets
+    }
 
     /**
      * Parse JSON directly
@@ -94,49 +115,124 @@ public class EnhancedResponseProcessor {
             return gson.fromJson(jsonContent, StructureData.class);
         }
         return null;
-    }
-
-    /**
+    }    /**
      * Use streaming JSON parser for large responses
      */
     private StructureData parseStreamingJson(String response) throws Exception {
         String cleaned = cleanResponse(response);
         JsonParser parser = jsonFactory.createParser(cleaned);
-          String name = null;
+        
+        String name = null;
         String description = null;
         StructureData.Size size = null;
         List<StructureData.Block> blocks = new ArrayList<>();
         
-        while (parser.nextToken() != JsonToken.END_OBJECT) {
-            String fieldName = parser.getCurrentName();
-            
-            if ("name".equals(fieldName)) {
-                parser.nextToken();
-                name = parser.getValueAsString();
-            } else if ("description".equals(fieldName)) {
-                parser.nextToken();
-                description = parser.getValueAsString();
-            } else if ("size".equals(fieldName)) {
-                parser.nextToken();
-                size = parseSize(parser);
-            } else if ("blocks".equals(fieldName)) {
-                parser.nextToken();
-                blocks = parseBlocksArray(parser);
+        try {
+            while (parser.nextToken() != null && parser.getCurrentToken() != JsonToken.END_OBJECT) {
+                String fieldName = parser.getCurrentName();
+                
+                if ("name".equals(fieldName)) {
+                    parser.nextToken();
+                    name = parser.getValueAsString();
+                } else if ("description".equals(fieldName)) {
+                    parser.nextToken();
+                    description = parser.getValueAsString();
+                } else if ("size".equals(fieldName)) {
+                    parser.nextToken();
+                    size = parseSize(parser);
+                } else if ("blocks".equals(fieldName)) {
+                    parser.nextToken();
+                    blocks = parseBlocksArraySafely(parser);
+                }
             }
+        } catch (Exception e) {
+            // If parsing fails partway through, we might still have some useful data
+            plugin.getLogger().warning("Streaming parser encountered error: " + e.getMessage() + 
+                                     ", attempting to use partial data");
+        } finally {
+            parser.close();
         }
         
-        parser.close();
-        
+        // Even if parsing failed, try to create a structure with what we have
         if (name != null && blocks != null && !blocks.isEmpty()) {
             StructureData result = new StructureData();
             result.setName(name);
             result.setDescription(description != null ? description : "AI Generated Structure");
             result.setSize(size != null ? size : calculateSize(blocks));
             result.setBlocks(blocks);
+            
+            plugin.getLogger().info("Streaming parser recovered " + blocks.size() + " blocks");
             return result;
         }
         
         return null;
+    }
+    
+    /**
+     * Parse blocks array with error recovery
+     */
+    private List<StructureData.Block> parseBlocksArraySafely(JsonParser parser) throws Exception {
+        List<StructureData.Block> blocks = new ArrayList<>();
+        
+        try {
+            while (parser.nextToken() != JsonToken.END_ARRAY) {
+                if (parser.getCurrentToken() == JsonToken.START_OBJECT) {
+                    try {
+                        StructureData.Block block = parseBlockObject(parser);
+                        if (block != null && block.getMaterial() != null) {
+                            blocks.add(block);
+                        }
+                    } catch (Exception e) {
+                        // Skip this block and continue with the next one
+                        plugin.getLogger().fine("Skipped malformed block: " + e.getMessage());
+                        skipToNextObject(parser);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Array might be truncated, return what we have
+            plugin.getLogger().warning("Blocks array parsing incomplete: " + e.getMessage() + 
+                                     ", recovered " + blocks.size() + " blocks");
+        }
+        
+        return blocks;
+    }
+    
+    /**
+     * Parse a single block object
+     */
+    private StructureData.Block parseBlockObject(JsonParser parser) throws Exception {
+        StructureData.Block block = new StructureData.Block();
+        
+        while (parser.nextToken() != JsonToken.END_OBJECT) {
+            String fieldName = parser.getCurrentName();
+            parser.nextToken();
+            
+            switch (fieldName) {
+                case "x" -> block.setX(parser.getValueAsInt());
+                case "y" -> block.setY(parser.getValueAsInt());
+                case "z" -> block.setZ(parser.getValueAsInt());
+                case "material" -> block.setMaterial(parser.getValueAsString());
+                case "data" -> block.setData(parser.getValueAsString());
+            }
+        }
+        
+        return block;
+    }
+    
+    /**
+     * Skip to the next object when parsing fails
+     */
+    private void skipToNextObject(JsonParser parser) throws Exception {
+        int depth = 0;
+        do {
+            JsonToken token = parser.nextToken();
+            if (token == JsonToken.START_OBJECT) {
+                depth++;
+            } else if (token == JsonToken.END_OBJECT) {
+                depth--;
+            }
+        } while (depth > 0 && parser.getCurrentToken() != null);
     }
 
     /**
@@ -216,13 +312,16 @@ public class EnhancedResponseProcessor {
         }
         
         return null;
-    }
-
-    /**
+    }    /**
      * Repair common JSON issues
      */
     private String repairJson(String json) {
         if (json == null) return "{}";
+        
+        String original = json;
+        
+        // Remove any incomplete elements at the end that might cause parsing issues
+        json = removeIncompleteElements(json);
         
         // Fix trailing commas
         json = json.replaceAll(",\\s*([}\\]])", "$1");
@@ -232,10 +331,17 @@ public class EnhancedResponseProcessor {
         
         // Fix unterminated strings by adding closing quote if needed
         if (json.contains("\"") && !isBalancedQuotes(json)) {
-            json = json + "\"";
+            // Find the last unmatched quote and close it
+            int lastQuote = json.lastIndexOf('"');
+            if (lastQuote > 0) {
+                String beforeQuote = json.substring(0, lastQuote);
+                if (!isBalancedQuotes(beforeQuote)) {
+                    json = json + "\"";
+                }
+            }
         }
         
-        // Ensure proper closure
+        // Ensure proper closure of arrays and objects
         while (countChar(json, '{') > countChar(json, '}')) {
             json += "}";
         }
@@ -244,8 +350,104 @@ public class EnhancedResponseProcessor {
             json += "]";
         }
         
+        // If the repair significantly changed the JSON, log it
+        if (json.length() != original.length()) {
+            plugin.getLogger().info("Repaired JSON: removed " + (original.length() - json.length()) + " characters");
+        }
+        
         return json;
-    }    // Helper methods for parsing and generation
+    }
+    
+    /**
+     * Remove incomplete JSON elements that could cause parsing failures
+     */
+    private String removeIncompleteElements(String json) {
+        // Look for common patterns of incomplete elements
+        
+        // Remove incomplete objects that don't have closing braces
+        json = json.replaceAll(",\\s*\\{[^}]*$", "");
+        
+        // Remove incomplete array elements
+        json = json.replaceAll(",\\s*\\[[^\\]]*$", "");
+        
+        // Remove incomplete strings at the end
+        json = json.replaceAll(",\\s*\"[^\"]*$", "");
+        
+        // Remove incomplete property assignments
+        json = json.replaceAll(",\\s*\"[^\"]*\"\\s*:\\s*[^,}\\]]*$", "");
+        
+        // Handle blocks array specifically - if it's incomplete, close it properly
+        if (json.contains("\"blocks\"") && json.contains("[")) {
+            int blocksStart = json.indexOf("\"blocks\"");
+            int arrayStart = json.indexOf("[", blocksStart);
+            if (arrayStart > 0) {
+                // Count braces and brackets from the blocks array start
+                String fromArray = json.substring(arrayStart);
+                int openBrackets = countChar(fromArray, '[');
+                int closeBrackets = countChar(fromArray, ']');
+                int openBraces = countChar(fromArray, '{');
+                int closeBraces = countChar(fromArray, '}');
+                
+                // If we have unmatched elements, try to find a safe truncation point
+                if (openBrackets > closeBrackets || openBraces > closeBraces) {
+                    // Find the last complete block object
+                    int lastCompleteBlock = findLastCompleteBlockIndex(json, arrayStart);
+                    if (lastCompleteBlock > arrayStart) {
+                        json = json.substring(0, lastCompleteBlock) + "]";
+                        // Add closing brace for the main object if needed
+                        if (countChar(json, '{') > countChar(json, '}')) {
+                            json += "}";
+                        }
+                    }
+                }
+            }
+        }
+        
+        return json;
+    }
+    
+    /**
+     * Find the index of the last complete block object in the blocks array
+     */
+    private int findLastCompleteBlockIndex(String json, int arrayStart) {
+        int lastGoodIndex = arrayStart + 1; // Start after the opening bracket
+        int braceCount = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        
+        for (int i = arrayStart + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString) {
+                if (c == '{') {
+                    braceCount++;
+                } else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0) {
+                        // We found a complete block object
+                        lastGoodIndex = i + 1;
+                    }
+                }
+            }
+        }
+        
+        return lastGoodIndex;
+    }// Helper methods for parsing and generation
     private StructureData.Size parseSize(JsonParser parser) throws Exception {
         StructureData.Size size = new StructureData.Size();
         while (parser.nextToken() != JsonToken.END_OBJECT) {
@@ -258,33 +460,7 @@ public class EnhancedResponseProcessor {
                 case "depth" -> size.setDepth(parser.getValueAsInt());
             }
         }
-        return size;
-    }    private List<StructureData.Block> parseBlocksArray(JsonParser parser) throws Exception {
-        List<StructureData.Block> blocks = new ArrayList<>();
-        
-        while (parser.nextToken() != JsonToken.END_ARRAY) {
-            StructureData.Block block = new StructureData.Block();
-            
-            while (parser.nextToken() != JsonToken.END_OBJECT) {
-                String fieldName = parser.getCurrentName();
-                parser.nextToken();
-                
-                switch (fieldName) {
-                    case "x" -> block.setX(parser.getValueAsInt());
-                    case "y" -> block.setY(parser.getValueAsInt());
-                    case "z" -> block.setZ(parser.getValueAsInt());
-                    case "material" -> block.setMaterial(parser.getValueAsString());
-                    case "data" -> block.setData(parser.getValueAsString());
-                }
-            }
-            
-            if (block.getMaterial() != null) {
-                blocks.add(block);
-            }
-        }
-        
-        return blocks;
-    }
+        return size;    }
 
     private boolean isValidStructure(StructureData structure) {
         return structure != null && 
