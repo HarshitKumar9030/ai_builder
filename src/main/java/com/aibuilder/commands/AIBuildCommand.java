@@ -64,8 +64,7 @@ public class AIBuildCommand implements CommandExecutor {
         
         CompletableFuture<StructureData> future = plugin.getAiManager().generateStructureWithProgress(description, maxSize,
             progress -> player.sendMessage("§7[AI] " + progress));
-        
-        future.thenAccept(structureData -> {
+          future.thenAccept(structureData -> {
             // Check if player is still online
             if (!player.isOnline()) {
                 return;
@@ -79,10 +78,12 @@ public class AIBuildCommand implements CommandExecutor {
                 player.sendMessage("§eStructure '" + structureData.getName() + "' will use " + estimatedSize + " blocks.");
                 player.sendMessage("§eType '/aibuild confirm' to proceed or '/aibuild cancel' to cancel.");
                 
-                // Store structure data for confirmation (you'd need to implement this storage)
-                // For now, we'll proceed directly
+                // TODO: Store structure data for confirmation system
+                // For now, we'll skip building when confirmation is required
+                return;
             }
-              // Start building with progress updates
+            
+            // Start building with progress updates (only if confirmation not required)
             plugin.getBuildManager().buildStructureWithProgress(player, structureData,
                 buildProgress -> player.sendMessage("§7[Build] " + buildProgress));
             
