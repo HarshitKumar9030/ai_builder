@@ -99,21 +99,24 @@ public class BuildManager {
                 }
             }
         }, 0L, plugin.getConfigManager().getBuildDelay());        activeBuildTasks.put(playerId, task);
-    }
-
-    /**
+    }    /**
      * Build structure with progress updates
      */
     public void buildStructureWithProgress(Player player, StructureData structureData, Consumer<String> progressCallback) {
+        plugin.getLogger().info("buildStructureWithProgress called for player: " + player.getName());
+        
         Location startLocation = player.getLocation();
         UUID playerId = player.getUniqueId();
 
         // Validate structure
         if (!validateStructure(structureData)) {
+            plugin.getLogger().warning("Structure validation failed, not building");
             progressCallback.accept("Invalid structure data!");
             player.sendMessage(plugin.getMessage("invalid-structure"));
             return;
         }
+
+        plugin.getLogger().info("Structure validation passed, proceeding to build");
 
         // Check if player is already building
         if (activeBuildTasks.containsKey(playerId)) {
@@ -219,33 +222,50 @@ public class BuildManager {
                 plugin.getLogger().warning("Failed to apply block data: " + e.getMessage());
             }
         }
-    }
-
-    /**
+    }    /**
      * Validate structure before building
      */
     private boolean validateStructure(StructureData structureData) {
-        if (structureData == null || structureData.getBlocks() == null) {
+        if (structureData == null) {
+            plugin.getLogger().warning("Structure validation failed: structureData is null");
+            return false;
+        }
+        
+        if (structureData.getBlocks() == null) {
+            plugin.getLogger().warning("Structure validation failed: blocks list is null");
             return false;
         }
         
         int maxSize = plugin.getConfigManager().getMaxStructureSize();
+        int blockCount = structureData.getBlocks().size();
+        
+        plugin.getLogger().info("Validating structure: " + blockCount + " blocks, maxSize: " + maxSize);
         
         // Check total block count
-        if (structureData.getBlocks().size() > maxSize * maxSize * maxSize) {
+        if (blockCount > maxSize * maxSize * maxSize) {
+            plugin.getLogger().warning("Structure validation failed: too many blocks (" + blockCount + " > " + (maxSize * maxSize * maxSize) + ")");
             return false;
         }
           // Check individual coordinates
-        for (StructureData.Block instruction : structureData.getBlocks()) {
+        for (int i = 0; i < structureData.getBlocks().size(); i++) {
+            StructureData.Block instruction = structureData.getBlocks().get(i);
+            if (instruction == null) {
+                plugin.getLogger().warning("Structure validation failed: block " + i + " is null");
+                return false;
+            }
+            
             if (Math.abs(instruction.getX()) > maxSize || 
                 Math.abs(instruction.getY()) > maxSize || 
                 Math.abs(instruction.getZ()) > maxSize) {
+                plugin.getLogger().warning("Structure validation failed: block " + i + " coordinates out of bounds: " + 
+                    instruction.getX() + "," + instruction.getY() + "," + instruction.getZ() + " (max: " + maxSize + ")");
                 return false;
             }
         }
         
+        plugin.getLogger().info("Structure validation passed!");
         return true;
-    }    /**
+    }/**
      * Cancel build for specific player
      */
     public void cancelBuild(UUID playerId) {
