@@ -128,8 +128,47 @@ public class AIBuildCommand implements CommandExecutor {
                 player.sendMessage(plugin.getMessage("building-failed", throwable.getMessage()));
             }
             return null;
-        });
-
-        return true;
+        });        return true;
+    }
+    
+    /**
+     * Log structure data to file for debugging
+     */
+    private void logStructureDataToFile(StructureData structureData) {
+        try {
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+            String filename = "structure_debug_" + timestamp + ".txt";
+            
+            try (FileWriter writer = new FileWriter(filename)) {
+                writer.write("=== STRUCTURE DATA DEBUG LOG ===\n");
+                writer.write("Timestamp: " + timestamp + "\n");
+                writer.write("Name: " + (structureData.getName() != null ? structureData.getName() : "NULL") + "\n");
+                writer.write("Description: " + (structureData.getDescription() != null ? structureData.getDescription() : "NULL") + "\n");
+                
+                if (structureData.getBlocks() != null) {
+                    writer.write("Total blocks: " + structureData.getBlocks().size() + "\n");
+                    writer.write("=== BLOCK DATA ===\n");
+                    
+                    for (int i = 0; i < structureData.getBlocks().size(); i++) {
+                        StructureData.Block block = structureData.getBlocks().get(i);
+                        if (block == null) {
+                            writer.write("Block " + i + ": NULL\n");
+                        } else {
+                            writer.write("Block " + i + ": " + block.getMaterial() + 
+                                " at (" + block.getX() + "," + block.getY() + "," + block.getZ() + ")" +
+                                (block.getData() != null ? " data: " + block.getData() : "") + "\n");
+                        }
+                    }
+                } else {
+                    writer.write("Blocks list: NULL\n");
+                }
+                
+                writer.write("=== END LOG ===\n");
+            }
+            
+            plugin.getLogger().info("Structure data logged to: " + filename);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to log structure data to file: " + e.getMessage());
+        }
     }
 }
