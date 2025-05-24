@@ -7,6 +7,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -63,12 +67,44 @@ public class AIBuildCommand implements CommandExecutor {
         int maxSize = plugin.getConfigManager().getMaxStructureSize();
         
         CompletableFuture<StructureData> future = plugin.getAiManager().generateStructureWithProgress(description, maxSize,
-            progress -> player.sendMessage("§7[AI] " + progress));
-          future.thenAccept(structureData -> {
+            progress -> player.sendMessage("§7[AI] " + progress));        future.thenAccept(structureData -> {
             // Check if player is still online
             if (!player.isOnline()) {
                 return;
             }
+              // Log structure data for debugging
+            plugin.getLogger().info("=== STRUCTURE DATA DEBUG ===");
+            if (structureData == null) {
+                plugin.getLogger().severe("StructureData is NULL!");
+                player.sendMessage("§cStructure generation failed - null data");
+                return;
+            }
+            
+            // Log to file for detailed analysis
+            logStructureDataToFile(structureData);
+            
+            plugin.getLogger().info("Structure Name: " + structureData.getName());
+            plugin.getLogger().info("Structure Description: " + structureData.getDescription());
+            
+            if (structureData.getBlocks() == null) {
+                plugin.getLogger().severe("Blocks list is NULL!");
+                player.sendMessage("§cStructure generation failed - no blocks");
+                return;
+            }
+            
+            plugin.getLogger().info("Total blocks: " + structureData.getBlocks().size());
+            
+            // Log first few blocks for debugging
+            for (int i = 0; i < Math.min(5, structureData.getBlocks().size()); i++) {
+                StructureData.Block block = structureData.getBlocks().get(i);
+                if (block == null) {
+                    plugin.getLogger().warning("Block " + i + " is NULL!");
+                } else {
+                    plugin.getLogger().info("Block " + i + ": " + block.getMaterial() + " at (" + 
+                        block.getX() + "," + block.getY() + "," + block.getZ() + ")");
+                }
+            }
+            plugin.getLogger().info("=== END STRUCTURE DATA DEBUG ===");
             
             // Check if confirmation is required
             int estimatedSize = plugin.getBuildManager().getEstimatedSize(structureData);
