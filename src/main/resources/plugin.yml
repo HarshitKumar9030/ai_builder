@@ -1,5 +1,5 @@
 name: AIStructureBuilder
-version: 1.0.0
+version: 2.0.0
 description: A Minecraft Spigot plugin that builds structures using Google Gemini AI
 author: YourName
 main: com.aibuilder.AIStructureBuilder

@@ -185,4 +185,53 @@ public class ConfigManager {
     public Object getValue(String path) {
         return config.get(path);
     }
+
+    /**
+     * Check if chunked generation is enabled
+     */
+    public boolean isChunkedGenerationEnabled() {
+        return config.getBoolean("building.enable-chunked-generation", true);
+    }
+
+    /**
+     * Get chunked generation threshold
+     */
+    public int getChunkedThreshold() {
+        return config.getInt("building.chunked-threshold", 1000);
+    }
+
+    /**
+     * Get chunk size for large structures
+     */
+    public int getChunkSize() {
+        return config.getInt("building.chunk-size", 32);
+    }
+
+    /**
+     * Get maximum chunks per structure
+     */
+    public int getMaxChunks() {
+        return config.getInt("building.max-chunks", 64);
+    }
+
+    /**
+     * Get connect timeout in seconds
+     */
+    public int getConnectTimeout() {
+        return config.getInt("gemini.timeout.connect", 30);
+    }
+
+    /**
+     * Get read timeout in seconds
+     */
+    public int getReadTimeout() {
+        return config.getInt("gemini.timeout.read", 60);
+    }
+
+    /**
+     * Get write timeout in seconds
+     */
+    public int getWriteTimeout() {
+        return config.getInt("gemini.timeout.write", 30);
+    }
 }

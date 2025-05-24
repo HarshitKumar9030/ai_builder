@@ -5,8 +5,8 @@ gemini:
   # Your Google Gemini API Key (get from https://makersuite.google.com/app/apikey)
   api-key: "YOUR_GEMINI_API_KEY_HERE"
   # Gemini model to use (gemini-2.0-flash-exp is recommended)
-  model: "gemini-2.0-flash-exp"  # Maximum tokens for AI response (reduced to prevent truncation)
-  max-tokens: 2000
+  model: "gemini-2.0-flash-exp"  # Maximum tokens for AI response (increased for larger structures)
+  max-tokens: 8000
   # Temperature for AI creativity (0.0 = deterministic, 1.0 = very creative)
   temperature: 0.7
   # Timeout settings (in seconds)
@@ -21,8 +21,16 @@ gemini:
 
 # Building Configuration
 building:
-  # Maximum size for AI-generated structures (safety limit)
-  max-structure-size: 100
+  # Maximum size for AI-generated structures (increased for large builds)
+  max-structure-size: 10000
+  # Enable chunked generation for large structures
+  enable-chunked-generation: true
+  # Size threshold for switching to chunked generation
+  chunked-threshold: 1000
+  # Chunk size for large structures
+  chunk-size: 32
+  # Maximum chunks per structure
+  max-chunks: 64
   # Default materials for structures
   default-materials:
     - "STONE"

@@ -21,6 +21,7 @@ public class AIManager {
     private final AIStructureBuilder plugin;
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final ChunkedGenerationManager chunkedManager;
     @Getter
     private boolean configured = false;
     
@@ -33,6 +34,7 @@ public class AIManager {
             .readTimeout(60, TimeUnit.SECONDS)
             .build();
         this.gson = new Gson();
+        this.chunkedManager = new ChunkedGenerationManager(plugin);
         // Don't call updateConfiguration() here - will be called after config is loaded
     }
 
@@ -88,12 +90,28 @@ public class AIManager {
             }
             return createFallbackStructure(description);
         });
-    }
-
-    /**
+    }    /**
      * Generate structure instructions using Gemini AI with progress updates
      */
     public CompletableFuture<StructureData> generateStructureWithProgress(String description, int maxSize, Consumer<String> progressCallback) {
+        // Check if we should use chunked generation for large structures
+        if (plugin.getConfigManager().isChunkedGenerationEnabled() && 
+            maxSize >= plugin.getConfigManager().getChunkedThreshold()) {
+            
+            progressCallback.accept("Large structure detected, using chunked generation...");
+            plugin.getLogger().info("Using chunked generation for large structure: " + description + " (target size: " + maxSize + ")");
+            
+            return chunkedManager.generateLargeStructure(description, maxSize, progressCallback);
+        }
+        
+        // Use regular generation for smaller structures
+        return generateRegularStructure(description, maxSize, progressCallback);
+    }
+    
+    /**
+     * Generate regular-sized structure
+     */
+    private CompletableFuture<StructureData> generateRegularStructure(String description, int maxSize, Consumer<String> progressCallback) {
         return CompletableFuture.supplyAsync(() -> {
             final int maxRetries = 3;
             Exception lastException = null;
@@ -208,30 +226,51 @@ public class AIManager {
         block.setMaterial(material);        block.setData("");
         return block;
     }
-    
-    /**
+      /**
      * Create a detailed prompt for structure generation
      */
     private String createPrompt(String description, int maxSize) {
-        // Limit structure size to prevent truncated responses
-        int actualMaxSize = Math.min(maxSize, 40); // Cap at 40 blocks to prevent truncation
+        // Use larger structure sizes for regular generation, but still cap to prevent API issues
+        int actualMaxSize = Math.min(maxSize, 2000); // Much larger cap for substantial structures
+        
+        // Determine structure complexity based on size
+        String sizeGuidance;
+        String dimensionGuidance;
+        if (actualMaxSize <= 100) {
+            sizeGuidance = "SMALL to MEDIUM";
+            dimensionGuidance = "Maximum size: 10x10x10 blocks";
+        } else if (actualMaxSize <= 500) {
+            sizeGuidance = "MEDIUM to LARGE";
+            dimensionGuidance = "Maximum size: 15x15x15 blocks";
+        } else {
+            sizeGuidance = "LARGE and DETAILED";
+            dimensionGuidance = "Maximum size: 20x20x20 blocks";
+        }
         
         return String.format(
-            "You are a Minecraft structure architect. Create a SMALL, SIMPLE structure for: \"%s\"\n\n" +
-            "STRICT REQUIREMENTS:\n" +
-            "- Maximum %d blocks total (CRITICAL - stay under this limit)\n" +
-            "- Use only these materials: STONE, STONE_BRICKS, OAK_PLANKS, GLASS, DIRT, GRASS_BLOCK\n" +
-            "- Keep it simple - basic shapes only\n" +
+            "You are a Minecraft master architect. Create a %s, DETAILED structure for: \"%s\"\n\n" +
+            "REQUIREMENTS:\n" +
+            "- Target %d blocks total (aim for substantial structures with good detail)\n" +
+            "- %s\n" +
+            "- Use diverse materials: STONE, STONE_BRICKS, COBBLESTONE, OAK_PLANKS, SPRUCE_PLANKS, BIRCH_PLANKS, GLASS, GLASS_PANE, DIRT, GRASS_BLOCK, QUARTZ_BLOCK, BRICK, SANDSTONE, OAK_LOG, SPRUCE_LOG, OAK_STAIRS, STONE_STAIRS, STONE_SLAB, OAK_SLAB\n" +
+            "- Create realistic, detailed architecture with proper foundations, walls, roofs, and interior features\n" +
+            "- Add architectural details like windows, doors, stairs, decorative elements\n" +
             "- Coordinates start at (0,0,0)\n" +
-            "- Maximum size: 5x5x5 blocks\n\n" +
+            "- Build upward and outward to create impressive structures\n\n" +
+            "STRUCTURE GUIDELINES:\n" +
+            "- For houses: Include foundation, walls, roof, windows, door frame\n" +
+            "- For castles: Include towers, walls, battlements, courtyard\n" +
+            "- For modern buildings: Include glass facades, geometric designs\n" +
+            "- For bridges: Include support pillars, railings, decorative arches\n" +
+            "- Always include proper foundations and structural support\n\n" +
             "RESPOND WITH VALID JSON ONLY (no markdown, no explanations):\n" +
             "{\n" +
             "  \"name\": \"Structure Name\",\n" +
-            "  \"description\": \"Brief description\",\n" +
+            "  \"description\": \"Detailed description\",\n" +
             "  \"size\": {\n" +
-            "    \"width\": 5,\n" +
-            "    \"height\": 4,\n" +
-            "    \"depth\": 5\n" +
+            "    \"width\": 15,\n" +
+            "    \"height\": 12,\n" +
+            "    \"depth\": 15\n" +
             "  },\n" +
             "  \"blocks\": [\n" +
             "    {\n" +
@@ -244,11 +283,13 @@ public class AIManager {
             "  ]\n" +
             "}\n\n" +
             "IMPORTANT:\n" +
-            "- Keep the block count LOW (under %d blocks)\n" +
+            "- Generate substantial structures with %d+ blocks for impressive builds\n" +
             "- Only respond with valid JSON\n" +
             "- Do not use markdown formatting\n" +
-            "- Keep coordinates within 0-4 range for x,y,z\n" +
-            "- Make it beautiful but SIMPLE",            description, actualMaxSize, actualMaxSize);
+            "- Use realistic proportions and architectural principles\n" +
+            "- Include detailed features and decorative elements\n" +
+            "- Make it architecturally sound and visually impressive",
+            sizeGuidance, description, actualMaxSize, dimensionGuidance, actualMaxSize);
     }
 
     /**
