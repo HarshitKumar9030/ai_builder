@@ -2,10 +2,10 @@ package com.aibuilder.manager;
 
 import com.aibuilder.AIStructureBuilder;
 import com.aibuilder.model.StructureData;
+import com.aibuilder.processor.EnhancedResponseProcessor;
 import com.google.gson.Gson;
 import lombok.Getter;
 import okhttp3.*;
-import org.bukkit.Location;
 
 import java.io.IOException;
 import java.util.*;
@@ -16,10 +16,10 @@ import java.util.function.Consumer;
  * Handles chunked generation for large structures
  */
 public class ChunkedGenerationManager {
-    
-    private final AIStructureBuilder plugin;
+      private final AIStructureBuilder plugin;
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final EnhancedResponseProcessor responseProcessor;
     
     @Getter
     private static class ChunkInfo {
@@ -35,8 +35,7 @@ public class ChunkedGenerationManager {
             this.context = context;
         }
     }
-    
-    public ChunkedGenerationManager(AIStructureBuilder plugin) {
+      public ChunkedGenerationManager(AIStructureBuilder plugin) {
         this.plugin = plugin;
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(plugin.getConfigManager().getConnectTimeout(), java.util.concurrent.TimeUnit.SECONDS)
@@ -44,6 +43,7 @@ public class ChunkedGenerationManager {
                 .writeTimeout(plugin.getConfigManager().getWriteTimeout(), java.util.concurrent.TimeUnit.SECONDS)
                 .build();
         this.gson = new Gson();
+        this.responseProcessor = new EnhancedResponseProcessor(plugin);
     }
     
     /**
@@ -207,11 +207,10 @@ public class ChunkedGenerationManager {
     
     /**
      * Generate a single chunk
-     */
-    private StructureData generateSingleChunk(ChunkInfo chunk, int chunkSize) throws IOException {
+     */    private StructureData generateSingleChunk(ChunkInfo chunk, int chunkSize) throws IOException {
         String chunkPrompt = createChunkPrompt(chunk, chunkSize);
         String response = callGeminiAPI(chunkPrompt);
-        return parseResponse(response);
+        return responseProcessor.processResponse(response, chunk.getDescription());
     }
     
     /**
@@ -303,8 +302,9 @@ public class ChunkedGenerationManager {
             
             String responseBody = response.body().string();
             
-            // Parse Gemini response format
+            // Parse Gemini response format            @SuppressWarnings("unchecked")
             Map<String, Object> responseMap = gson.fromJson(responseBody, Map.class);
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseMap.get("candidates");
             
             if (candidates != null && !candidates.isEmpty()) {

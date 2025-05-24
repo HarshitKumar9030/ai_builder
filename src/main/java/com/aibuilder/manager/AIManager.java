@@ -2,6 +2,7 @@ package com.aibuilder.manager;
 
 import com.aibuilder.AIStructureBuilder;
 import com.aibuilder.model.StructureData;
+import com.aibuilder.processor.EnhancedResponseProcessor;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -17,15 +18,14 @@ import java.util.function.Consumer;
  * Manages AI interactions with Google Gemini API
  */
 public class AIManager {
-    
-    private final AIStructureBuilder plugin;
+      private final AIStructureBuilder plugin;
     private final OkHttpClient httpClient;
     private final Gson gson;
     private final ChunkedGenerationManager chunkedManager;
+    private final EnhancedResponseProcessor responseProcessor;
     @Getter
     private boolean configured = false;
-    
-    public AIManager(AIStructureBuilder plugin) {
+      public AIManager(AIStructureBuilder plugin) {
         this.plugin = plugin;
         // Configure HTTP client with timeouts
         this.httpClient = new OkHttpClient.Builder()
@@ -35,6 +35,7 @@ public class AIManager {
             .build();
         this.gson = new Gson();
         this.chunkedManager = new ChunkedGenerationManager(plugin);
+        this.responseProcessor = new EnhancedResponseProcessor(plugin);
         // Don't call updateConfiguration() here - will be called after config is loaded
     }
 
@@ -129,11 +130,10 @@ public class AIManager {
                     
                     String prompt = createPrompt(description, maxSize);
                     progressCallback.accept("Sending request to Gemini AI...");
-                    
-                    String response = callGeminiAPI(prompt);
+                      String response = callGeminiAPI(prompt);
                     progressCallback.accept("Processing AI response...");
                     
-                    StructureData result = parseResponse(response);
+                    StructureData result = responseProcessor.processResponse(response, description);
                     progressCallback.accept("Structure generation completed successfully!");
                     
                     plugin.getLogger().info("Structure generated successfully!");
